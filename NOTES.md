@@ -7,12 +7,15 @@
 - Ending a connection now clears both participants' busy state. Signaling also checks that the sender has a live session and rejects malformed or offline sessions.
 - Added a separate random session bearer token. The database stores only its SHA-256 hash; map-visible session IDs alone no longer authorize polling, signaling, or leaving.
 - Kept stale-row cleanup as a fallback for tabs that close without a successful `sendBeacon`.
-- Could not run a two-browser/database session: no PostgreSQL or Mapbox credentials were supplied. The build and lint checks pass locally; database behavior still needs a credentialed smoke test.
+- Fixed the presence poll UI so API failures show “Connection issue — retrying” instead of misleading users with a zero count and a green online indicator.
+- Production build and lint pass. The database schema was pushed to the Neon production branch and Prisma reported it in sync; the local `.env` was left unchanged.
+- A real two-browser session covering simultaneous presence, chat, and video has not been verified yet. Use two separate browser profiles with different mock locations for that end-to-end check.
 
 ## Phase 2 — Make it good
 
 - Reworked the entry screen with a clearer privacy explanation, location permission state, accessible error message, and responsive dark visual treatment.
 - Added a map header and a compact connection panel so presence and next steps are easy to understand on desktop and mobile.
+- Presence status now distinguishes connection checking, a healthy live count, and poll failures.
 
 ## Phase 3 — Make it secure
 
@@ -33,6 +36,8 @@
 
 - `npm install`, Prisma client generation (with a temporary local-only placeholder URL), `npm run lint`, and `npm run build` completed. The temporary URL was not saved to disk.
 - `npm audit` currently reports 9 high advisories and 0 critical; `npm audit --omit=dev` reports 4 high advisories from Prisma dependency paths.
-- No `.env`, database URL, or Mapbox token was available. `prisma db push`, local end-to-end use, and Vercel deployment therefore still need real credentials.
-- Vercel project linking was attempted after pushing the public repo, but the connected Vercel team has no GitHub integration installed. The Vercel API rejected project creation; a team admin must enable that integration. A usable deployment also needs the real database URL and Mapbox token.
+- Public repository: https://github.com/donnelsimbajon-design/pulse-assessment (branch `main`). Changes are committed incrementally; latest UI status fix is `b8e08fa`.
+- Neon project tooling is linked to the user's separate Neon project; schema push completed successfully without overwriting the local `.env`.
+- The Vercel app domain responds with HTTP 200. The latest commit's deployment status could not be independently checked because Vercel API access returned 403 for the project scope; confirm that `b8e08fa` is Ready in the Vercel Deployments page.
+- The live map only shows actual online sessions. No sample stranger rows were inserted, to avoid presenting fake people as real users.
 - Next.js 16.4.0's local Route Handler and environment-variable guides were reviewed before implementation.
