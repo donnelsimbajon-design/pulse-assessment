@@ -3,6 +3,7 @@
 ## Phase 1 — Make it run
 
 - Fixed the heartbeat query so polling refreshes only the caller. Previously, one active user kept every presence row alive indefinitely.
+- Stale-session cleanup now also removes queued signals for expired participants, preventing an offline requester from leaving a stale incoming prompt.
 - Ending a connection now clears both participants' busy state. Signaling also checks that the sender has a live session and rejects malformed or offline sessions.
 - Added a separate random session bearer token. The database stores only its SHA-256 hash; map-visible session IDs alone no longer authorize polling, signaling, or leaving.
 - Kept stale-row cleanup as a fallback for tabs that close without a successful `sendBeacon`.

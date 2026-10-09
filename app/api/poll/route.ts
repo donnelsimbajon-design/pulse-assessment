@@ -34,9 +34,23 @@ export async function GET(request: NextRequest) {
     data: { lastSeen: new Date(now) },
   });
 
-  // 2) Reap stale presence rows and orphaned signals (independent deletes —
-  // no atomicity needed, and avoids transactions over a PgBouncer pooler).
+  // 2) Reap stale presence rows and their queued signals. Without removing
+  // these mailboxes, a recently-closed requester could leave a stale incoming
+  // prompt that can never be accepted. Chunk IDs to keep each SQL query small.
+  const staleSessions = await prisma.presence.findMany({
+    where: { lastSeen: { lt: staleCutoff } },
+    select: { id: true },
+  });
   await prisma.presence.deleteMany({ where: { lastSeen: { lt: staleCutoff } } });
+
+  for (let i = 0; i < staleSessions.length; i += 500) {
+    const staleIds = staleSessions.slice(i, i + 500).map((session) => session.id);
+    await prisma.signal.deleteMany({
+      where: { OR: [{ fromId: { in: staleIds } }, { toId: { in: staleIds } }] },
+    });
+  }
+
+  // Reap old orphan signals even when no presence row remains for the sender.
   await prisma.signal.deleteMany({ where: { createdAt: { lt: signalCutoff } } });
 
   // 3) Online peers, excluding self.
