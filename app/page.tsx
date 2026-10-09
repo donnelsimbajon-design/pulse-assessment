@@ -23,6 +23,7 @@ type VideoState = "none" | "requesting" | "incoming" | "active";
 type PresenceStatus = "checking" | "online" | "retrying";
 
 const REQUEST_TIMEOUT_MS = 30_000;
+const CONNECT_TIMEOUT_MS = 20_000;
 const VIDEO_REQUEST_TIMEOUT_MS = 30_000;
 
 export default function Home() {
@@ -58,6 +59,7 @@ export default function Home() {
   const peerRef = useRef<PeerSession | null>(null);
   const msgId = useRef(0);
   const requestTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const connectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const videoRequestTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const demoReplyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -77,6 +79,8 @@ export default function Home() {
 
   function teardown(message?: string) {
     if (requestTimer.current) clearTimeout(requestTimer.current);
+    if (connectTimer.current) clearTimeout(connectTimer.current);
+    connectTimer.current = null;
     clearVideoRequestTimer();
     if (demoReplyTimer.current) clearTimeout(demoReplyTimer.current);
     demoReplyTimer.current = null;
@@ -93,7 +97,9 @@ export default function Home() {
   function startPeer(peerId: string, initiator: boolean) {
     const ps = new PeerSession(initiator, {
       onSignal: (type: DescType, payload: string) => {
-        void sendSignal(sessionId, sessionToken, peerId, type, payload);
+        void sendSignal(sessionId, sessionToken, peerId, type, payload).then((ok) => {
+          if (!ok) teardown("Signaling failed. Check your connection and try again.");
+        });
       },
       onChat: (text) => addMessage(false, text),
       onControl: (ctrl) => handleControl(ctrl),
@@ -105,10 +111,23 @@ export default function Home() {
         }
       },
       onChannelOpen: () => {
+        if (connectTimer.current) clearTimeout(connectTimer.current);
+        connectTimer.current = null;
         setConn({ kind: "connected", peerId });
       },
     });
     peerRef.current = ps;
+  }
+
+  function watchForConnection(peerId: string) {
+    if (connectTimer.current) clearTimeout(connectTimer.current);
+    connectTimer.current = setTimeout(() => {
+      const current = connRef.current;
+      if (current.kind === "connecting" && current.peerId === peerId) {
+        void sendSignal(sessionId, sessionToken, peerId, "end");
+        teardown("Couldn't establish the chat connection. Please try again.");
+      }
+    }, CONNECT_TIMEOUT_MS);
   }
 
   function handleControl(ctrl: PeerControl) {
@@ -168,7 +187,12 @@ export default function Home() {
       }, 700);
       return;
     }
-    void sendSignal(sessionId, sessionToken, peerId, "request");
+    void sendSignal(sessionId, sessionToken, peerId, "request").then((ok) => {
+      if (!ok && connRef.current.kind === "requesting" && connRef.current.peerId === peerId) {
+        if (requestTimer.current) clearTimeout(requestTimer.current);
+        teardown("Couldn't send the connection request. Please try again.");
+      }
+    });
     requestTimer.current = setTimeout(() => {
       if (
         connRef.current.kind === "requesting" &&
@@ -195,6 +219,7 @@ export default function Home() {
     startPeer(peerId, false);
     void sendSignal(sessionId, sessionToken, peerId, "accept");
     setConn({ kind: "connecting", peerId });
+    watchForConnection(peerId);
   }
 
   function declineIncoming() {
@@ -281,6 +306,7 @@ export default function Home() {
           if (requestTimer.current) clearTimeout(requestTimer.current);
           startPeer(sig.fromId, true);
           setConn({ kind: "connecting", peerId: sig.fromId });
+          watchForConnection(sig.fromId);
         }
         break;
       }

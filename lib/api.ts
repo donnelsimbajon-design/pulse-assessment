@@ -30,12 +30,19 @@ export async function sendSignal(
   toId: string,
   type: SignalType,
   payload?: string,
-): Promise<void> {
-  await fetch("/api/signal", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ fromId, token, toId, type, payload }),
-  });
+): Promise<boolean> {
+  try {
+    const res = await fetch("/api/signal", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fromId, token, toId, type, payload }),
+    });
+    if (!res.ok) console.warn(`Signal ${type} failed: ${res.status}`);
+    return res.ok;
+  } catch (error) {
+    console.warn(`Signal ${type} failed to reach the server.`, error);
+    return false;
+  }
 }
 
 // Fire-and-forget leave that survives the tab closing.

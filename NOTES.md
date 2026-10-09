@@ -31,6 +31,7 @@
 - Added **Drift to someone**, which selects a random available stranger and starts the same consent-based connection request as clicking a map dot. Busy peers are excluded.
 - Added three clearly labeled simulated demo companions around the user's map location. When no real strangers are online, Drift opens a simulated chat so the interaction can be previewed; demo profiles are client-side only and never appear in the live-user count or database.
 - Video requests now expire after 30 seconds with a retry prompt; WebRTC failures send an end signal so both participants are released from the busy state.
+- Fixed chat data-channel messages using different type names on send and receive, and now applies queued ICE candidates only after the remote description is set. Added a timeout and visible error when signaling or chat connection setup fails.
 - Next steps: allow a user to opt out of discovery, add request throttling, and test the consent and busy-state transitions with two real sessions.
 
 ## Setup and delivery notes
