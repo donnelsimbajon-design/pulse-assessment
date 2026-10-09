@@ -12,6 +12,7 @@ export default function ChatPanel({
   messages,
   connected,
   videoBusy,
+  demoLabel,
   onSend,
   onStartVideo,
   onEnd,
@@ -19,6 +20,7 @@ export default function ChatPanel({
   messages: ChatMessage[];
   connected: boolean;
   videoBusy: boolean;
+  demoLabel?: string;
   onSend: (text: string) => void;
   onStartVideo: () => void;
   onEnd: () => void;
@@ -42,15 +44,19 @@ export default function ChatPanel({
     <div className="absolute inset-y-0 right-0 z-20 flex w-full max-w-md flex-col border-l border-zinc-800 bg-zinc-950 text-zinc-100 shadow-2xl">
       <header className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
         <div>
-          <p className="font-semibold">Stranger</p>
+          <div className="flex items-center gap-2">
+            <p className="font-semibold">{demoLabel ? `${demoLabel} · Demo` : "Stranger"}</p>
+            {demoLabel && <span className="rounded-full bg-violet-400/15 px-2 py-0.5 text-[10px] font-medium text-violet-200">SIMULATED</span>}
+          </div>
           <p className="text-xs text-zinc-500">
-            {connected ? "Connected" : "Connecting…"}
+            {connected ? (demoLabel ? "Demo chat · not a live person" : "Connected") : "Connecting…"}
           </p>
         </div>
         <div className="flex gap-2">
           <button
             onClick={onStartVideo}
-            disabled={!connected || videoBusy}
+            disabled={!connected || videoBusy || Boolean(demoLabel)}
+            title={demoLabel ? "Video is unavailable in demo mode" : undefined}
             className="rounded-full border border-zinc-700 px-3 py-1.5 text-sm hover:border-zinc-500 disabled:opacity-40"
           >
             Video

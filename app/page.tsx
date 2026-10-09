@@ -10,6 +10,7 @@ import { join, leave, poll, sendSignal } from "@/lib/api";
 import { PeerSession, type DescType, type PeerControl } from "@/lib/webrtc";
 import { POLL_INTERVAL_MS } from "@/lib/presence";
 import { type PeerDot, type SignalMsg } from "@/lib/types";
+import { getDemoPeers, getDemoReply } from "@/lib/demo-peers";
 
 type Conn =
   | { kind: "idle" }
@@ -37,6 +38,8 @@ export default function Home() {
   const [myLocation, setMyLocation] = useState<{ lat: number; lng: number } | null>(
     null,
   );
+  const demoPeers = myLocation ? getDemoPeers(myLocation) : [];
+  const visiblePeers = [...peers, ...demoPeers];
 
   const [conn, _setConn] = useState<Conn>({ kind: "idle" });
   const connRef = useRef<Conn>(conn);
@@ -56,6 +59,7 @@ export default function Home() {
   const msgId = useRef(0);
   const requestTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const videoRequestTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const demoReplyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function clearVideoRequestTimer() {
     if (videoRequestTimer.current) clearTimeout(videoRequestTimer.current);
@@ -74,6 +78,8 @@ export default function Home() {
   function teardown(message?: string) {
     if (requestTimer.current) clearTimeout(requestTimer.current);
     clearVideoRequestTimer();
+    if (demoReplyTimer.current) clearTimeout(demoReplyTimer.current);
+    demoReplyTimer.current = null;
     peerRef.current?.close();
     peerRef.current = null;
     setLocalStream(null);
@@ -146,6 +152,22 @@ export default function Home() {
   function requestConnection(peerId: string) {
     if (connRef.current.kind !== "idle") return;
     setConn({ kind: "requesting", peerId });
+    if (peerId.startsWith("demo-")) {
+      requestTimer.current = setTimeout(() => {
+        if (
+          connRef.current.kind === "requesting" &&
+          connRef.current.peerId === peerId
+        ) {
+          if (requestTimer.current) clearTimeout(requestTimer.current);
+          setConn({ kind: "connected", peerId });
+          addMessage(
+            false,
+            "Hi! I'm a simulated demo companion, not a live person. Send a message to try the chat.",
+          );
+        }
+      }, 700);
+      return;
+    }
     void sendSignal(sessionId, sessionToken, peerId, "request");
     requestTimer.current = setTimeout(() => {
       if (
@@ -160,7 +182,9 @@ export default function Home() {
 
   function cancelRequest() {
     if (connRef.current.kind === "requesting") {
-      void sendSignal(sessionId, sessionToken, connRef.current.peerId, "end");
+      if (!connRef.current.peerId.startsWith("demo-")) {
+        void sendSignal(sessionId, sessionToken, connRef.current.peerId, "end");
+      }
     }
     teardown();
   }
@@ -181,13 +205,20 @@ export default function Home() {
 
   function endConnection() {
     const c = connRef.current;
-    if (c.kind === "connecting" || c.kind === "connected") {
+    if (
+      (c.kind === "connecting" || c.kind === "connected") &&
+      !c.peerId.startsWith("demo-")
+    ) {
       void sendSignal(sessionId, sessionToken, c.peerId, "end");
     }
     teardown();
   }
 
   function startVideoRequest() {
+    if (connRef.current.kind === "connected" && connRef.current.peerId.startsWith("demo-")) {
+      showNotice("Video calls need a real live participant.");
+      return;
+    }
     if (videoRef.current !== "none" || !peerRef.current) return;
     setVideo("requesting");
     peerRef.current.sendControl("video-request");
@@ -345,20 +376,23 @@ export default function Home() {
   }
 
   const inChat = conn.kind === "connecting" || conn.kind === "connected";
+  const activeDemo = conn.kind === "connected"
+    ? demoPeers.find((peer) => peer.id === conn.peerId)
+    : undefined;
 
   return (
     <main className="fixed inset-0 overflow-hidden">
       <WorldMap
-        peers={peers}
+        peers={visiblePeers}
+        onlineCount={peers.length}
         presenceStatus={presenceStatus}
         me={myLocation}
         onPeerClick={requestConnection}
         onRandomConnect={() => {
           const available = peers.filter((peer) => !peer.busy);
-          if (available.length > 0) {
-            const peer = available[Math.floor(Math.random() * available.length)];
-            requestConnection(peer.id);
-          }
+          const choices = available.length > 0 ? available : demoPeers;
+          const peer = choices[Math.floor(Math.random() * choices.length)];
+          if (peer) requestConnection(peer.id);
         }}
         canConnect={conn.kind === "idle"}
       />
@@ -396,9 +430,22 @@ export default function Home() {
           messages={messages}
           connected={conn.kind === "connected"}
           videoBusy={video !== "none"}
+          demoLabel={activeDemo?.label}
           onSend={(text) => {
             peerRef.current?.sendChat(text);
             addMessage(true, text);
+            if (activeDemo) {
+              if (demoReplyTimer.current) clearTimeout(demoReplyTimer.current);
+              demoReplyTimer.current = setTimeout(() => {
+                if (
+                  connRef.current.kind === "connected" &&
+                  connRef.current.peerId === activeDemo.id
+                ) {
+                  addMessage(false, getDemoReply(text));
+                }
+                demoReplyTimer.current = null;
+              }, 900);
+            }
           }}
           onStartVideo={startVideoRequest}
           onEnd={endConnection}

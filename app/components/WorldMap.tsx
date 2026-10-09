@@ -17,6 +17,7 @@ function dotColor(id: string): string {
 
 export default function WorldMap({
   peers,
+  onlineCount,
   presenceStatus,
   me,
   onPeerClick,
@@ -24,6 +25,7 @@ export default function WorldMap({
   canConnect,
 }: {
   peers: PeerDot[];
+  onlineCount: number;
   presenceStatus: "checking" | "online" | "retrying";
   me: { lat: number; lng: number } | null;
   onPeerClick: (id: string) => void;
@@ -129,8 +131,11 @@ export default function WorldMap({
         if (!marker) {
           const el = document.createElement("button");
           el.className = "pulse-dot";
-          el.style.background = dotColor(peer.id);
-          el.title = "Tap to connect";
+          el.style.background = peer.demo ? "#a78bfa" : dotColor(peer.id);
+          el.title = peer.demo
+            ? `Demo companion ${peer.label ?? ""} — simulated, not a live user. Tap to try a demo chat.`
+            : "Tap to connect";
+          if (peer.demo) el.style.border = "2px dashed rgba(255,255,255,.9)";
           el.addEventListener("click", (e) => {
             e.stopPropagation();
             if (canConnectRef.current) onPeerClickRef.current(peer.id);
@@ -140,6 +145,12 @@ export default function WorldMap({
             .addTo(map);
           markers.set(peer.id, marker);
         }
+        marker.getElement().style.background = peer.demo
+          ? "#a78bfa"
+          : dotColor(peer.id);
+        marker.getElement().title = peer.demo
+          ? `Demo companion ${peer.label ?? ""} — simulated, not a live user. Tap to try a demo chat.`
+          : "Tap to connect";
         marker.getElement().style.opacity = peer.busy ? "0.35" : "1";
       }
 
@@ -180,18 +191,25 @@ export default function WorldMap({
               <p className="text-[11px] text-zinc-400">A little closer to someone new.</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs text-zinc-300">
-            <span
-              className={`h-2 w-2 rounded-full ${presenceStatus === "online" ? "animate-pulse bg-emerald-400" : presenceStatus === "retrying" ? "bg-amber-400" : "animate-pulse bg-zinc-400"}`}
-              aria-hidden="true"
-            />
-            <span aria-live="polite">
-              {presenceStatus === "checking"
-                ? "Checking connection…"
-                : presenceStatus === "retrying"
-                  ? "Connection issue — retrying"
-                  : `${peers.length} ${peers.length === 1 ? "stranger" : "strangers"} nearby`}
-            </span>
+          <div className="flex flex-col items-end gap-1">
+            <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs text-zinc-300">
+              <span
+                className={`h-2 w-2 rounded-full ${presenceStatus === "online" ? "animate-pulse bg-emerald-400" : presenceStatus === "retrying" ? "bg-amber-400" : "animate-pulse bg-zinc-400"}`}
+                aria-hidden="true"
+              />
+              <span aria-live="polite">
+                {presenceStatus === "checking"
+                  ? "Checking connection…"
+                  : presenceStatus === "retrying"
+                    ? "Connection issue — retrying"
+                    : `${onlineCount} ${onlineCount === 1 ? "stranger" : "strangers"} nearby`}
+              </span>
+            </div>
+            {peers.some((peer) => peer.demo) && (
+              <span className="pr-2 text-[10px] text-violet-200">
+                Demo dots are simulated
+              </span>
+            )}
           </div>
         </div>
       </div>
