@@ -19,6 +19,7 @@ type Conn =
   | { kind: "connected"; peerId: string };
 
 type VideoState = "none" | "requesting" | "incoming" | "active";
+type PresenceStatus = "checking" | "online" | "retrying";
 
 const REQUEST_TIMEOUT_MS = 30_000;
 const VIDEO_REQUEST_TIMEOUT_MS = 30_000;
@@ -28,6 +29,7 @@ export default function Home() {
   const [sessionId] = useState(() => crypto.randomUUID());
   const [sessionToken] = useState(() => `${crypto.randomUUID()}${crypto.randomUUID()}`);
   const [peers, setPeers] = useState<PeerDot[]>([]);
+  const [presenceStatus, setPresenceStatus] = useState<PresenceStatus>("checking");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
@@ -304,8 +306,13 @@ export default function Home() {
         const data = await poll(sessionId, sessionToken);
         if (!active) return;
         setPeers(data.peers);
+        setPresenceStatus("online");
         for (const s of data.signals) processSignalRef.current(s);
-      } catch {}
+      } catch (error) {
+        if (!active) return;
+        setPresenceStatus("retrying");
+        console.warn("Pulse presence poll failed; retrying.", error);
+      }
       if (active) timer = setTimeout(tick, POLL_INTERVAL_MS);
     };
     tick();
@@ -343,6 +350,7 @@ export default function Home() {
     <main className="fixed inset-0 overflow-hidden">
       <WorldMap
         peers={peers}
+        presenceStatus={presenceStatus}
         me={myLocation}
         onPeerClick={requestConnection}
         onRandomConnect={() => {

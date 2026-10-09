@@ -17,12 +17,14 @@ function dotColor(id: string): string {
 
 export default function WorldMap({
   peers,
+  presenceStatus,
   me,
   onPeerClick,
   onRandomConnect,
   canConnect,
 }: {
   peers: PeerDot[];
+  presenceStatus: "checking" | "online" | "retrying";
   me: { lat: number; lng: number } | null;
   onPeerClick: (id: string) => void;
   onRandomConnect: () => void;
@@ -179,8 +181,17 @@ export default function WorldMap({
             </div>
           </div>
           <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs text-zinc-300">
-            <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" aria-hidden="true" />
-            <span>{peers.length} {peers.length === 1 ? "stranger" : "strangers"} nearby</span>
+            <span
+              className={`h-2 w-2 rounded-full ${presenceStatus === "online" ? "animate-pulse bg-emerald-400" : presenceStatus === "retrying" ? "bg-amber-400" : "animate-pulse bg-zinc-400"}`}
+              aria-hidden="true"
+            />
+            <span aria-live="polite">
+              {presenceStatus === "checking"
+                ? "Checking connection…"
+                : presenceStatus === "retrying"
+                  ? "Connection issue — retrying"
+                  : `${peers.length} ${peers.length === 1 ? "stranger" : "strangers"} nearby`}
+            </span>
           </div>
         </div>
       </div>
