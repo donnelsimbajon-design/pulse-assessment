@@ -32,4 +32,5 @@
 - `npm install`, Prisma client generation (with a temporary local-only placeholder URL), `npm run lint`, and `npm run build` completed. The temporary URL was not saved to disk.
 - `npm audit` currently reports 9 high advisories and 0 critical; `npm audit --omit=dev` reports 4 high advisories from Prisma dependency paths.
 - No `.env`, database URL, or Mapbox token was available. `prisma db push`, local end-to-end use, and Vercel deployment therefore still need real credentials.
+- Vercel project linking was attempted after pushing the public repo, but the connected Vercel team has no GitHub integration installed. The Vercel API rejected project creation; a team admin must enable that integration. A usable deployment also needs the real database URL and Mapbox token.
 - Next.js 16.4.0's local Route Handler and environment-variable guides were reviewed before implementation.
