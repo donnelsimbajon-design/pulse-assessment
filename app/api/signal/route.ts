@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import type { SignalType } from "@/lib/types";
+import { isAuthorizedSession } from "@/lib/session-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,12 +29,19 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "invalid body" }, { status: 400 });
   }
 
-  const { fromId, toId, type, payload } = (body ?? {}) as Record<
+  const { fromId, token, toId, type, payload } = (body ?? {}) as Record<
     string,
     unknown
   >;
 
   if (typeof fromId !== "string" || typeof toId !== "string") {
+    return Response.json({ error: "invalid ids" }, { status: 400 });
+  }
+  if (
+    fromId.length < 8 || fromId.length > 64 ||
+    toId.length < 8 || toId.length > 64 ||
+    fromId === toId
+  ) {
     return Response.json({ error: "invalid ids" }, { status: 400 });
   }
   if (typeof type !== "string" || !VALID_TYPES.includes(type as SignalType)) {
@@ -49,6 +57,27 @@ export async function POST(request: NextRequest) {
 
   const signalType = type as SignalType;
   const payloadStr = typeof payload === "string" ? payload : null;
+
+  if (!(await isAuthorizedSession(fromId, token))) {
+    return Response.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  // Only live sessions may participate in signaling. Presence IDs remain
+  // bearer identifiers, so clients must generate unguessable session IDs.
+  const participants = await prisma.presence.findMany({
+    where: { id: { in: [fromId, toId] } },
+    select: { id: true },
+  });
+  if (!participants.some((participant) => participant.id === fromId)) {
+    return Response.json({ error: "session offline" }, { status: 404 });
+  }
+  if (signalType === "request" && !participants.some((p) => p.id === toId)) {
+    await sendDecline(toId, fromId);
+    return Response.json({ ok: true, autoDeclined: true });
+  }
+  if (!participants.some((participant) => participant.id === toId)) {
+    return Response.json({ error: "session offline" }, { status: 404 });
+  }
 
   // Enforce "one active connection at a time": if the target is already busy,
   // auto-decline the request instead of delivering it.
@@ -77,6 +106,11 @@ export async function POST(request: NextRequest) {
       data: { busy: true },
     });
   } else if (signalType === "decline") {
+    await prisma.presence.updateMany({
+      where: { id: { in: [fromId, toId] } },
+      data: { busy: false },
+    });
+  } else if (signalType === "end") {
     await prisma.presence.updateMany({
       where: { id: { in: [fromId, toId] } },
       data: { busy: false },

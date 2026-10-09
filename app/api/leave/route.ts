@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { isAuthorizedSession } from "@/lib/session-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -9,15 +10,21 @@ export const dynamic = "force-dynamic";
 // the body may arrive as text — parse defensively.
 export async function POST(request: NextRequest) {
   let id: string | undefined;
+  let token: unknown;
   try {
     const text = await request.text();
-    id = text ? (JSON.parse(text)?.id as string | undefined) : undefined;
+    const body = text ? JSON.parse(text) : undefined;
+    id = body?.id as string | undefined;
+    token = body?.token;
   } catch {
     id = undefined;
   }
 
   if (typeof id !== "string" || !id) {
     return Response.json({ error: "invalid id" }, { status: 400 });
+  }
+  if (!(await isAuthorizedSession(id, token))) {
+    return Response.json({ error: "unauthorized" }, { status: 401 });
   }
 
   // Independent cleanup deletes — no atomicity needed (and interactive

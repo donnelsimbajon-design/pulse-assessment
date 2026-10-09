@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { STALE_MS, SIGNAL_TTL_MS } from "@/lib/presence";
+import { isAuthorizedSession } from "@/lib/session-auth";
 import type { PollResponse } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -16,6 +17,12 @@ export async function GET(request: NextRequest) {
   if (!id) {
     return Response.json({ error: "missing id" }, { status: 400 });
   }
+  if (id.length < 8 || id.length > 64) {
+    return Response.json({ error: "invalid id" }, { status: 400 });
+  }
+  if (!(await isAuthorizedSession(id, request.headers.get("authorization")?.replace(/^Bearer\s+/i, "")))) {
+    return Response.json({ error: "unauthorized" }, { status: 401 });
+  }
 
   const now = Date.now();
   const staleCutoff = new Date(now - STALE_MS);
@@ -23,7 +30,7 @@ export async function GET(request: NextRequest) {
 
   // 1) Heartbeat — refresh lastSeen for the caller.
   await prisma.presence.updateMany({
-    where: {},
+    where: { id },
     data: { lastSeen: new Date(now) },
   });
 
