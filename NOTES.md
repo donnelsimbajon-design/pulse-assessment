@@ -26,6 +26,7 @@
 ## Phase 4 — Make it better
 
 - Added **Drift to someone**, which selects a random available stranger and starts the same consent-based connection request as clicking a map dot. Busy peers are excluded.
+- Video requests now expire after 30 seconds with a retry prompt; WebRTC failures send an end signal so both participants are released from the busy state.
 - Next steps: allow a user to opt out of discovery, add request throttling, and test the consent and busy-state transitions with two real sessions.
 
 ## Setup and delivery notes
