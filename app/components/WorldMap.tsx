@@ -5,7 +5,7 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import type { Map as MapboxMap, Marker } from "mapbox-gl";
 import type { PeerDot } from "@/lib/types";
 
-const TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "pk.eyJ1IjoicHVsc2UtbWFwIiwiYSI6ImNrMDBkZW1vMDAwMDAwMDAifQ.AAAAAAAAAAAAAAAAAAAAAA";
+const TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
 
 function dotColor(id: string): string {
   let hash = 0;
@@ -19,11 +19,13 @@ export default function WorldMap({
   peers,
   me,
   onPeerClick,
+  onRandomConnect,
   canConnect,
 }: {
   peers: PeerDot[];
   me: { lat: number; lng: number } | null;
   onPeerClick: (id: string) => void;
+  onRandomConnect: () => void;
   canConnect: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -167,9 +169,37 @@ export default function WorldMap({
         </div>
       )}
 
-      {/* Online count */}
-      <div className="absolute bottom-4 left-4 rounded-full bg-zinc-900/80 px-3 py-1.5 text-xs text-zinc-300 backdrop-blur">
-        {peers.length} online
+      <div className="pointer-events-none absolute inset-x-0 top-0 flex justify-center p-4 sm:p-6">
+        <div className="pointer-events-auto flex w-full max-w-5xl items-center justify-between rounded-2xl border border-white/10 bg-zinc-950/75 px-4 py-3 text-zinc-100 shadow-2xl backdrop-blur-xl sm:px-5">
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-400 text-lg font-black text-zinc-950 shadow-[0_0_24px_rgba(52,211,153,.28)]">P</span>
+            <div>
+              <p className="font-semibold tracking-tight">Pulse</p>
+              <p className="text-[11px] text-zinc-400">A little closer to someone new.</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs text-zinc-300">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" aria-hidden="true" />
+            <span>{peers.length} {peers.length === 1 ? "stranger" : "strangers"} nearby</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="absolute inset-x-0 bottom-0 flex justify-center p-5 sm:p-8">
+        <div className="flex w-full max-w-md items-center gap-3 rounded-2xl border border-white/10 bg-zinc-950/85 p-3 text-zinc-100 shadow-2xl backdrop-blur-xl">
+          <div className="min-w-0 flex-1 px-2">
+            <p className="text-sm font-medium">The world is listening</p>
+            <p className="mt-0.5 text-xs text-zinc-400">Choose a dot or let chance decide.</p>
+          </div>
+          <button
+            type="button"
+            onClick={onRandomConnect}
+            disabled={!canConnect || peers.every((peer) => peer.busy)}
+            className="shrink-0 rounded-xl bg-emerald-400 px-4 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-emerald-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Drift to someone
+          </button>
+        </div>
       </div>
     </div>
   );
